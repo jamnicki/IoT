@@ -1,0 +1,1 @@
+{"base": {"broadcast_mode": 1, "method": "http", "data_source": "with_anomalies.csv", "send_freq": 1}, "http": {"address": "http://localhost:5000"}, "mqtt": {"address": "broker.hivemq.com", "topic": "w61psWyytw084seq/Sensors/Sensor1"}, "components": {"heater": {"running": 1, "temp_error": -10.9}}}

@@ -1,0 +1,11 @@
+# IDE
+.vscode
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+# Environments
+myvenv
+
+# Main database
+sensorsdb.db

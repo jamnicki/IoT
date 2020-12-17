@@ -1,0 +1,1 @@
+{"base": {"broadcast_mode": 1, "method": "http", "data_source": "light_motion.csv", "send_freq": 1}, "http": {"address": "http://localhost:5000"}, "mqtt": {"address": "test.mosquitto.org", "topic": "w61psWyytw084seq/Sensors/Sensor5"}}
