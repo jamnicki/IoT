@@ -1,10 +1,14 @@
 import re
 import requests
 import json
+import sqlite3
+import time
 
 import tkinter as tk
+import pandas as pd
 
 from tkinter import messagebox
+from tkinter import ttk
 
 
 class Manager:
@@ -14,6 +18,8 @@ class Manager:
         master.resizable(False, False)
 
         # SRC
+        self.save_data_img = tk.PhotoImage(file='./src/save_to_file.png')
+        self.inspect_img = tk.PhotoImage(file='./src/inspect.png')
         self.settings_img = tk.PhotoImage(file='./src/settings.png')
         self.send_command_button = tk.PhotoImage(file='./src/send_command.png')
         self.green_circ_img = tk.PhotoImage(file='./src/green_circle.png')
@@ -41,6 +47,8 @@ class Manager:
                                       self.sensor3_data_preview_container,
                                       self.sensor4_data_preview_container,
                                       self.sensor5_data_preview_container ]
+
+        self.sensor1_inspect_button = tk.Button(self.sensor1_container, command=self.open_datapreview1_toplevel_window, borderwidth=0, activebackground=self.sensor1_container['bg'], image=self.inspect_img)
 
         self.sensor1_settings_button = tk.Button(self.sensor1_container, command=self.open_settings1_toplevel_window,borderwidth=0, activebackground=self.sensor1_container['bg'], image=self.settings_img)
         self.sensor2_settings_button = tk.Button(self.sensor2_container, command=self.open_settings2_toplevel_window,borderwidth=0, activebackground=self.sensor2_container['bg'], image=self.settings_img)
@@ -136,10 +144,11 @@ class Manager:
         self.start_heater_button = tk.Button(self.acctuators_container, text='start_heater', command=lambda: self.manage_heater(command=1))
         self.stop_heater_button = tk.Button(self.acctuators_container, text='stop_heater', command=lambda: self.manage_heater(command=0))
         self.start_humidifier_button = tk.Button(self.acctuators_container, text='start_humidifier', command=lambda: self.manage_humidifier(command=1))
-        self.stop_humidifier_button = tk.Button(self.acctuators_container, text='stop_humidifier', command=lambda: self.manage_humidifier(command=0))
+        self.stop_humidifier_button = tk.Button(self.acctuators_container, text='stop_humidifier',command=lambda: self.manage_humidifier(command=0))
 
         # EMPTY
-        self.space_label = tk.Label(self.acctuators_container, background=self.acctuators_container['bg'])
+        self.space_label = tk.Label(self.acctuators_container,
+                                    background=self.acctuators_container['bg'])
         
         # LAYOUT
         self.sensor1_container.grid(row=0, column=0)
@@ -148,6 +157,8 @@ class Manager:
         self.sensor4_container.grid(row=0, column=1)
         self.sensor5_container.grid(row=1, column=1)
         self.acctuators_container.grid(row=2, column=1)
+
+        self.sensor1_inspect_button.place(relx=0.13, rely=0)
 
         self.sensor1_settings_button.place(relx=0.2, rely=0)
         self.sensor2_settings_button.place(relx=0.2, rely=0)
@@ -333,6 +344,42 @@ class Manager:
         settings_entry5.place(relx=0.05, rely=0.85)
         send_call_from_settings_button.place(relx=0.87, rely=0.815)
 
+    def open_datapreview1_toplevel_window(self):
+        top = tk.Toplevel()
+        top.geometry('1020x400')
+        top.resizable(False, False)
+
+        # WIDGETS
+        global inspect1_timestamp
+        global tree
+        tree = ttk.Treeview(top, column=("c1", "c2", "c3", "c4", "c5"), show='headings')
+        tree.column("#1")
+        tree.heading("#1", text="recv_time")
+        tree.column("#2")
+        tree.heading("#2", text="room_id")
+        tree.column("#3")
+        tree.heading("#3", text="noted_date")
+        tree.column("#4")
+        tree.heading("#4", text="temp")
+        tree.column("#5")
+        tree.heading("#5", text="method")
+
+        inspect1_timestamp = tk.Entry(top, width=40)
+        entry_label = tk.Label(top, text='Timestamp(s):')
+        preview_button = tk.Button(top, text='Preview data', command=lambda: self.data_preview(sensor_num=1, timestamp=inspect1_timestamp.get()))
+        clear_tree_button = tk.Button(top, text='Clear', command=lambda: self.clear_treeview(tree=tree))
+        save_data_button = tk.Button(top, image=self.save_data_img, borderwidth=0, activebackground=top['bg'],
+                                     command=lambda: self.save_data_to_csv(sensor_num=1, timestamp=inspect1_timestamp.get()))
+
+        # LAYOUT
+        entry_label.place(relx=0.01, rely=0.01)
+        inspect1_timestamp.place(relx=0.11, rely=0.01, width=70)
+        preview_button.place(relx=0.22, rely=0.01)
+        tree.place(relx=0.01, rely=0.1)
+        clear_tree_button.place(relx=0.9, rely=0.01)
+        save_data_button.place(relx=0.33, rely=0.01)
+
+
     def send_call_from_settings(self, sensor_name):
         match = re.search(r'Sensor(\d+)', sensor_name)
         sensor_num = int(match.group(1))
@@ -467,3 +514,37 @@ class Manager:
 
     def open_messagebox(self, title, message):
         messagebox.showwarning(title, message)
+
+    def data_preview(self, sensor_num, timestamp):
+        global tree
+        con = sqlite3.connect('sensorsdb.db')
+        cur = con.cursor()
+
+        cur.execute(f"""SELECT *
+        FROM Sensor{sensor_num}
+        WHERE strftime('%s','now', '+1 hour')-strftime('%s', recv_time)<{timestamp}""")
+        records = cur.fetchall()
+        for record in records:
+            print(record)
+            tree.insert('', tk.END, values=record)
+        con.close()
+    
+    def save_data_to_csv(self, sensor_num, timestamp):
+        con = sqlite3.connect('sensorsdb.db')
+        cur = con.cursor()
+
+        cur.execute(f"""SELECT *
+        FROM Sensor{sensor_num}
+        WHERE strftime('%s','now', '+1 hour')-strftime('%s', recv_time)<{timestamp}""")
+        records = cur.fetchall()
+
+        cur.execute(f'PRAGMA table_info(Sensor{sensor_num})')
+        table_info = cur.fetchall()
+        col_names = [col_info[1] for col_info in table_info]
+
+        df = pd.DataFrame(records, columns=col_names)
+        df.to_csv(f'sensor{sensor_num}_last{timestamp}s__{int(time.time())}.csv')
+
+    def clear_treeview(self, tree):
+        for i in tree.get_children():
+            tree.delete(i)
