@@ -6,6 +6,7 @@ import time
 
 import tkinter as tk
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from tkinter import messagebox
 from tkinter import ttk
@@ -370,6 +371,7 @@ class Manager:
         clear_tree_button = tk.Button(top, text='Clear', command=lambda: self.clear_treeview(tree=tree))
         save_data_button = tk.Button(top, image=self.save_data_img, borderwidth=0, activebackground=top['bg'],
                                      command=lambda: self.save_data_to_csv(sensor_num=1, timestamp=inspect1_timestamp.get()))
+        show_chart_button = tk.Button(top, text='Show chart', command=lambda: self.show_chart(sensor_num=1, timestamp=inspect1_timestamp.get()))
 
         # LAYOUT
         entry_label.place(relx=0.01, rely=0.01)
@@ -378,6 +380,7 @@ class Manager:
         tree.place(relx=0.01, rely=0.1)
         clear_tree_button.place(relx=0.9, rely=0.01)
         save_data_button.place(relx=0.33, rely=0.01)
+        show_chart_button.place(relx=0.36, rely=0.01)
 
 
     def send_call_from_settings(self, sensor_name):
@@ -524,10 +527,12 @@ class Manager:
         FROM Sensor{sensor_num}
         WHERE strftime('%s','now', '+1 hour')-strftime('%s', recv_time)<{timestamp}""")
         records = cur.fetchall()
-        for record in records:
-            print(record)
-            tree.insert('', tk.END, values=record)
-        con.close()
+        if len(records) > 0:
+            for record in records:
+                tree.insert('', tk.END, values=record)
+            con.close()
+        else:
+            self.open_messagebox(title='Table display warning', message='No data found')
     
     def save_data_to_csv(self, sensor_num, timestamp):
         con = sqlite3.connect('sensorsdb.db')
@@ -548,3 +553,21 @@ class Manager:
     def clear_treeview(self, tree):
         for i in tree.get_children():
             tree.delete(i)
+
+    def show_chart(self, sensor_num, timestamp):
+        con = sqlite3.connect('sensorsdb.db')
+        cur = con.cursor()
+
+        cur.execute(f"""SELECT temp, recv_time
+        FROM Sensor{sensor_num}
+        WHERE strftime('%s','now', '+1 hour')-strftime('%s', recv_time)<{timestamp}""")
+
+        records = cur.fetchall()
+
+        if len(records) > 0:
+            plt.plot([record[1] for record in records], [record[0] for record in records])
+            xticks_step = int(len(records)*0.2)
+            plt.xticks([records[0][1]]+[record[1] for record in records][::xticks_step]+[records[-1][1]], rotation=15)
+            plt.show()
+        else:
+            self.open_messagebox(title='Chart display warning', message='No data found')
